@@ -1,0 +1,16 @@
+services:
+  checkin:
+    build: .
+    image: starrail-checkin:local
+    container_name: starrail-checkin
+    restart: unless-stopped
+    environment:
+      HOST: 0.0.0.0
+      PORT: 8787
+      DATA_DIR: /app/data
+      AUTH_USERNAME: ${AUTH_USERNAME:-admin}
+      AUTH_PASSWORD: ${AUTH_PASSWORD:-}
+    ports:
+      - "127.0.0.1:${HOST_PORT:-8787}:8787"
+    volumes:
+      - ./data:/app/data

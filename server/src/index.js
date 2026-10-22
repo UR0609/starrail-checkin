@@ -1,5 +1,6 @@
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
+import { appendFile, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
@@ -17,6 +18,7 @@ import {
   registerDeviceFp,
   sendLoginCode,
 } from "./mihoyo.js";
+import { changeGatePassword, createGateFile, loadGate } from "./gate.js";
 import { createStore, toPublic } from "./store.js";
 import { mergeSignedDates } from "./sign.js";
 import { clampTime, isPastSlot, nextRunAt, shanghaiDate, shouldCatchUp } from "./time.js";
@@ -25,7 +27,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = process.env.DATA_DIR || path.resolve(here, "../../data");
 const distDir = path.resolve(here, "../../client/dist");
 const port = Number(process.env.PORT || 8787);
-const host = "127.0.0.1";
+const host = process.env.HOST || "127.0.0.1";
 
 const store = createStore(dataDir);
 const runner = createRunner(store);
@@ -144,11 +146,95 @@ async function finishLogin(session, scanned) {
   return session.done;
 }
 
+const authFile = path.join(dataDir, "auth.json");
+let gate;
+
 const app = express();
 app.disable("x-powered-by");
 app.use(express.json({ limit: "32kb" }));
 
+const loginFailures = new Map();
+
+function clientKey(req) {
+  return req.ip || req.socket?.remoteAddress || "local";
+}
+
+app.use((req, res, next) => {
+  if (!req.path.startsWith("/api/")) return next();
+  if (req.path === "/api/health" || req.path === "/api/auth/login" || req.path === "/api/auth/session" || req.path === "/api/auth/logout") {
+    return next();
+  }
+  if (!gate?.readRequest(req)) {
+    res.status(401).json({ message: "请先登录" });
+    return;
+  }
+  next();
+});
+
 app.get("/api/health", (_req, res) => {
+  res.json({ ok: true });
+});
+
+app.get("/api/auth/session", (req, res) => {
+  res.json({ ok: Boolean(gate?.readRequest(req)) });
+});
+
+app.post("/api/auth/login", (req, res) => {
+  const key = clientKey(req);
+  const failure = loginFailures.get(key);
+  if (failure && failure.count >= 8 && Date.now() - failure.at < 60_000) {
+    res.status(429).json({ message: "试得太勤了，请一分钟后再登录" });
+    return;
+  }
+  const username = String(req.body?.username || "");
+  const password = String(req.body?.password || "");
+  if (!gate.login(username, password)) {
+    const count = failure && Date.now() - failure.at < 60_000 ? failure.count + 1 : 1;
+    loginFailures.set(key, { count, at: Date.now() });
+    res.status(401).json({ message: "用户名或密码不正确" });
+    return;
+  }
+  loginFailures.delete(key);
+  res.setHeader("Set-Cookie", gate.cookie(username));
+  res.json({ ok: true });
+});
+
+app.post("/api/auth/logout", (_req, res) => {
+  res.setHeader("Set-Cookie", gate.clearCookie());
+  res.json({ ok: true });
+});
+
+async function rememberPagePassword(password) {
+  const notes = path.join(dataDir, "本地记录.md");
+  try {
+    const text = await readFile(notes, "utf8");
+    const next = text.replace(/^- 密码：.*$/m, `- 密码：\`${password}\``);
+    if (next === text) return;
+    await writeFile(notes, next, { mode: 0o600 });
+  } catch {
+    // 没有本地记录时，密码只保存在 auth.json。
+  }
+}
+
+app.post("/api/auth/password", async (req, res) => {
+  const currentPassword = String(req.body?.currentPassword || "");
+  const newPassword = String(req.body?.newPassword || "");
+  if (newPassword.length < 8 || newPassword.length > 64) {
+    res.status(400).json({ message: "新密码请用 8 到 64 个字符" });
+    return;
+  }
+  if (newPassword === currentPassword) {
+    res.status(400).json({ message: "新密码要和当前密码不一样" });
+    return;
+  }
+  const next = await changeGatePassword(authFile, currentPassword, newPassword);
+  if (!next) {
+    res.status(401).json({ message: "当前密码不正确" });
+    return;
+  }
+  gate = next;
+  await rememberPagePassword(newPassword);
+  res.setHeader("Set-Cookie", gate.cookie(gate.username));
   res.json({ ok: true });
 });
 
@@ -488,6 +574,21 @@ app.use((error, _req, res, _next) => {
   console.error("[服务]", message);
   res.status(500).json({ message });
 });
+
+try {
+  gate = await loadGate(authFile);
+} catch {
+  const username = process.env.AUTH_USERNAME || "admin";
+  const password = process.env.AUTH_PASSWORD || randomBytes(12).toString("base64url");
+  await createGateFile(authFile, { username, password });
+  gate = await loadGate(authFile);
+  await appendFile(
+    path.join(dataDir, "本地记录.md"),
+    `\n\n## 自动生成的页面登录\n\n- 用户名：${username}\n- 密码：${password}\n`,
+    { mode: 0o600 },
+  );
+  console.log("[登录] 已生成本机访问账号，写在 data/本地记录.md");
+}
 
 const server = app.listen(port, host, () => {
   console.log(`签到助手 http://${host}:${port}`);

@@ -309,7 +309,23 @@ button:disabled { opacity: 0.5; cursor: wait; }
 
 .sms-form { display: grid; gap: 12px; }
 
-.sms-form .field input { width: 100%; }
+.sms-form .field input,
+.login-card .field input { width: 100%; }
+
+.login-card,
+.password-card {
+  display: grid;
+  gap: 14px;
+  width: min(420px, 100%);
+  margin-top: 18px;
+}
+
+.password-card .field input { width: 100%; }
+
+.notice {
+  margin: 16px 0 0;
+  color: var(--ok);
+}
 
 .qr-wrap {
   display: grid;

@@ -12,6 +12,15 @@ const nextRunAt = ref("");
 const error = ref("");
 const busy = ref(false);
 const qrOpen = ref(false);
+const authed = ref(false);
+const ready = ref(false);
+const loginName = ref("");
+const loginPassword = ref("");
+const showPasswordForm = ref(false);
+const currentPassword = ref("");
+const nextPassword = ref("");
+const nextPasswordAgain = ref("");
+const notice = ref("");
 const showAllHistory = ref(false);
 const pendingDelete = ref("");
 
@@ -116,15 +125,97 @@ function onQrDone() {
   });
 }
 
-onMounted(() => {
-  load().catch((err) => {
+async function enter() {
+  error.value = "";
+  busy.value = true;
+  try {
+    await api("/api/auth/login", {
+      method: "POST",
+      body: { username: loginName.value.trim(), password: loginPassword.value },
+    });
+    loginPassword.value = "";
+    authed.value = true;
+    await load();
+  } catch (err) {
     error.value = err.message;
-  });
+  } finally {
+    busy.value = false;
+  }
+}
+
+async function changePassword() {
+  error.value = "";
+  notice.value = "";
+  if (nextPassword.value !== nextPasswordAgain.value) {
+    error.value = "两次输入的新密码不一致";
+    return;
+  }
+  busy.value = true;
+  try {
+    await api("/api/auth/password", {
+      method: "POST",
+      body: { currentPassword: currentPassword.value, newPassword: nextPassword.value },
+    });
+    currentPassword.value = "";
+    nextPassword.value = "";
+    nextPasswordAgain.value = "";
+    showPasswordForm.value = false;
+    notice.value = "密码已修改";
+  } catch (err) {
+    error.value = err.message;
+  } finally {
+    busy.value = false;
+  }
+}
+
+async function logout() {
+  await api("/api/auth/logout", { method: "POST" });
+  authed.value = false;
+  accounts.value = [];
+  history.value = [];
+}
+
+onMounted(async () => {
+  try {
+    const session = await api("/api/auth/session");
+    authed.value = Boolean(session.ok);
+    if (authed.value) await load();
+  } catch (err) {
+    error.value = err.message;
+  } finally {
+    ready.value = true;
+  }
 });
 </script>
 
 <template>
-  <main class="page">
+  <main v-if="!ready" class="page">
+    <p class="muted">正在确认登录状态</p>
+  </main>
+  <main v-else-if="!authed" class="page">
+    <header>
+      <div class="brand">
+        <div>
+          <p class="eyebrow">米游社 · 崩坏：星穹铁道</p>
+          <h1>签到助手</h1>
+        </div>
+      </div>
+      <p class="lede">这是本机访问锁。通过之后才能看到米游社账号和签到记录。</p>
+    </header>
+    <form class="card login-card" @submit.prevent="enter">
+      <label class="field">
+        <span>用户名</span>
+        <input v-model="loginName" autocomplete="username" />
+      </label>
+      <label class="field">
+        <span>密码</span>
+        <input v-model="loginPassword" type="password" autocomplete="current-password" />
+      </label>
+      <p v-if="error" class="banner">{{ error }}</p>
+      <button type="submit" class="primary" :disabled="busy">登录</button>
+    </form>
+  </main>
+  <main v-else class="page">
     <header>
       <div class="brand">
         <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
@@ -163,9 +254,28 @@ onMounted(() => {
         <button type="button" :disabled="busy" @click="refresh">刷新状态</button>
         <button type="button" :disabled="busy || !accounts.length" @click="checkin()">全部签到</button>
         <button type="button" class="primary" :disabled="busy" @click="qrOpen = true">添加角色</button>
+        <button type="button" :disabled="busy" @click="showPasswordForm = !showPasswordForm">修改密码</button>
+        <button type="button" :disabled="busy" @click="logout">退出</button>
       </div>
     </section>
 
+    <form v-if="showPasswordForm" class="card password-card" @submit.prevent="changePassword">
+      <label class="field">
+        <span>当前密码</span>
+        <input v-model="currentPassword" type="password" autocomplete="current-password" />
+      </label>
+      <label class="field">
+        <span>新密码</span>
+        <input v-model="nextPassword" type="password" autocomplete="new-password" />
+      </label>
+      <label class="field">
+        <span>再输入一次</span>
+        <input v-model="nextPasswordAgain" type="password" autocomplete="new-password" />
+      </label>
+      <button type="submit" class="primary" :disabled="busy">保存新密码</button>
+    </form>
+
+    <p v-if="notice" class="notice">{{ notice }}</p>
     <p v-if="error" class="banner">{{ error }}</p>
 
     <section v-if="!accounts.length" class="empty">
