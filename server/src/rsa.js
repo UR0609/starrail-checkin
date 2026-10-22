@@ -1,0 +1,15 @@
+import { constants, publicEncrypt } from "node:crypto";
+
+const PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDDvekdPMHN3AYhm/vktJT+YJr7
+cI5DcsNKqdsx5DZX0gDuWFuIjzdwButrIYPNmRJ1G8ybDIF7oDW2eEpm5sMbL9zs
+9ExXCdvqrn51qELbqj0XxtMTIpaCHFSI50PfPpTFV9Xt/hmyVwokoOXFlAEgCn+Q
+CgGs52bFoYMtyi+xEQIDAQAB
+-----END PUBLIC KEY-----`;
+
+export function rsaEncrypt(text) {
+  return publicEncrypt(
+    { key: PUBLIC_KEY, padding: constants.RSA_PKCS1_PADDING },
+    Buffer.from(String(text)),
+  ).toString("base64");
+}

@@ -1,0 +1,13 @@
+{
+  "name": "starrail-checkin",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "start": "npm run build -w client && npm run start -w server",
+    "test": "npm run test -w server"
+  },
+  "workspaces": [
+    "client",
+    "server"
+  ]
+}
