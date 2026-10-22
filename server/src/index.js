@@ -389,6 +389,14 @@ app.post("/api/login/sms/send", async (req, res, next) => {
       });
       return;
     }
+    if (String(detail.json.message || "").includes("频繁")) {
+      smsSentAt.set(phone, Date.now());
+      res.status(429).json({
+        message: "米哈游限制了短信发送，请等 60 秒再试一次，这段时间不要重复点击",
+        retryAfter: 60,
+      });
+      return;
+    }
     smsSessions.delete(session.id);
     console.error("[登录] 短信发送失败", detail.json.retcode, detail.json.message);
     res.status(400).json({ message: detail.json.message || "验证码没有发出去" });

@@ -10,6 +10,10 @@ export async function api(path, { method = "GET", body } = {}) {
     throw new Error("签到服务没有启动。请在项目目录运行 npm run dev。");
   }
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.message || "请求失败");
+  if (!response.ok) {
+    const error = new Error(data.message || "请求失败");
+    error.retryAfter = data.retryAfter;
+    throw error;
+  }
   return data;
 }

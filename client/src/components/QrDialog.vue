@@ -17,6 +17,8 @@ const smsCode = ref("");
 const smsSession = ref("");
 const smsStep = ref("phone");
 const phoneMask = ref("");
+const waitSeconds = ref(0);
+let waitTimer = 0;
 
 let sessionId = "";
 let timer = 0;
@@ -140,7 +142,17 @@ function openCaptcha(payload) {
   });
 }
 
+function startWait(seconds) {
+  waitSeconds.value = seconds;
+  window.clearInterval(waitTimer);
+  waitTimer = window.setInterval(() => {
+    waitSeconds.value -= 1;
+    if (waitSeconds.value <= 0) window.clearInterval(waitTimer);
+  }, 1000);
+}
+
 async function sendSms() {
+  if (busy.value || waitSeconds.value > 0) return;
   status.value = "pending";
   message.value = "正在发送验证码";
   busy.value = true;
@@ -160,6 +172,8 @@ async function sendSms() {
   } catch (error) {
     status.value = "error";
     message.value = error.message;
+    const wait = Number(error.retryAfter) || (String(error.message).includes("频繁") ? 60 : 0);
+    if (wait > 0) startWait(wait);
   } finally {
     busy.value = false;
   }
@@ -204,7 +218,10 @@ watch(
   },
 );
 
-onBeforeUnmount(() => window.clearInterval(timer));
+onBeforeUnmount(() => {
+  window.clearInterval(timer);
+  window.clearInterval(waitTimer);
+});
 </script>
 
 <template>
@@ -243,7 +260,9 @@ onBeforeUnmount(() => window.clearInterval(timer));
         <p :class="{ warn: status === 'error' }">{{ message }}</p>
         <div class="dialog-actions">
           <button type="button" @click="emit('close')">关闭</button>
-          <button v-if="smsStep === 'phone'" type="submit" class="primary" :disabled="busy">获取验证码</button>
+          <button v-if="smsStep === 'phone'" type="submit" class="primary" :disabled="busy || waitSeconds > 0">
+            {{ waitSeconds > 0 ? `请等待 ${waitSeconds} 秒` : "获取验证码" }}
+          </button>
           <button v-else-if="smsStep === 'captcha'" type="button" class="primary" :disabled="busy" @click="captchaObj?.verify()">再次验证</button>
           <template v-else>
             <button type="button" :disabled="busy" @click="resetSms(); message = '请重新获取验证码'">换个号码</button>
