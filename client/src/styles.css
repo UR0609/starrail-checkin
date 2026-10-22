@@ -67,6 +67,20 @@ h1 {
   letter-spacing: 0.04em;
 }
 
+.header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.account-actions {
+  display: flex;
+  gap: 10px;
+  flex: none;
+  margin-top: 8px;
+}
+
 .lede {
   max-width: 680px;
   margin: 18px 0 0;
@@ -82,7 +96,7 @@ h1 {
 
 .board {
   display: grid;
-  grid-template-columns: 1.1fr 1fr auto;
+  grid-template-columns: auto auto minmax(0, 1fr);
   gap: 22px;
   align-items: end;
   margin-top: 28px;
@@ -107,7 +121,13 @@ h1 {
   align-items: center;
 }
 
-.time-form { align-items: end; }
+.time-form { align-items: end; flex: none; }
+
+.time-form button,
+.actions button,
+.account-actions button {
+  white-space: nowrap;
+}
 
 .field { display: grid; gap: 6px; }
 
@@ -340,6 +360,8 @@ button:disabled { opacity: 0.5; cursor: wait; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 10px; }
 
 @media (max-width: 860px) {
+  .header-top { flex-direction: column; }
+  .account-actions { width: 100%; justify-content: flex-end; }
   .board { grid-template-columns: 1fr; }
   .actions, .card-head, .role, .history-row { align-items: stretch; flex-direction: column; }
   h1 { font-size: 36px; }

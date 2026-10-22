@@ -217,15 +217,21 @@ onMounted(async () => {
   </main>
   <main v-else class="page">
     <header>
-      <div class="brand">
-        <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
-          <rect x="4" y="4" width="56" height="56" fill="none" stroke="#e4c07a" stroke-width="2" />
-          <path d="M10 40h44M18 24h28" stroke="#e4c07a" stroke-width="2" />
-          <circle cx="32" cy="24" r="4" fill="#e4c07a" />
-        </svg>
-        <div>
-          <p class="eyebrow">米游社 · 崩坏：星穹铁道</p>
-          <h1>签到助手</h1>
+      <div class="header-top">
+        <div class="brand">
+          <svg class="mark" viewBox="0 0 64 64" aria-hidden="true">
+            <rect x="4" y="4" width="56" height="56" fill="none" stroke="#e4c07a" stroke-width="2" />
+            <path d="M10 40h44M18 24h28" stroke="#e4c07a" stroke-width="2" />
+            <circle cx="32" cy="24" r="4" fill="#e4c07a" />
+          </svg>
+          <div>
+            <p class="eyebrow">米游社 · 崩坏：星穹铁道</p>
+            <h1>签到助手</h1>
+          </div>
+        </div>
+        <div class="account-actions">
+          <button type="button" :disabled="busy" @click="showPasswordForm = !showPasswordForm">修改密码</button>
+          <button type="button" :disabled="busy" @click="logout">退出</button>
         </div>
       </div>
       <p class="lede">
@@ -254,8 +260,6 @@ onMounted(async () => {
         <button type="button" :disabled="busy" @click="refresh">刷新状态</button>
         <button type="button" :disabled="busy || !accounts.length" @click="checkin()">全部签到</button>
         <button type="button" class="primary" :disabled="busy" @click="qrOpen = true">添加角色</button>
-        <button type="button" :disabled="busy" @click="showPasswordForm = !showPasswordForm">修改密码</button>
-        <button type="button" :disabled="busy" @click="logout">退出</button>
       </div>
     </section>
 
